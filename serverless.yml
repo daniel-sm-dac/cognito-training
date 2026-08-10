@@ -1,0 +1,221 @@
+service: cognito-training
+
+frameworkVersion: '3'
+
+plugins:
+  - serverless-offline
+
+custom:
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'ap-southeast-1'}
+  serverless-offline:
+    httpPort: 3000
+    lambdaPort: 3002
+
+  commonTags:
+    project: cognito-training
+    environment: ${self:custom.stage}
+
+  # tableName: 'user-table-${self:custom.stage}'
+
+provider:
+  name: aws
+  runtime: python3.9
+  region: ${self:custom.region}
+  stage: ${self:custom.stage}
+  profile: ${opt:aws-profile, 'dev'}
+  memorySize: 256
+  timeout: 10
+
+  #Tags the CloudFormation stack itself
+  stackTags: ${self:custom.commonTags}
+
+  # Tags every individual taggable resource (Lambda functions, the
+  # auto-generated IAM role, etc.)
+  tags: ${self:custom.commonTags}
+
+  # Environment variables available to all functions
+  environment:
+    STAGE: ${self:custom.stage}
+    USER_PROFILE_TABLE: ${self:service}-${self:provider.stage}-user-profiles
+
+  # http:
+  #   cors: true
+
+  iam:
+    role: arn:aws:iam::710318463284:role/dac-uag2-lambda-execution-role-develop
+
+
+# you can overwrite defaults here
+#  stage: dev
+#  region: us-east-1
+
+# you can add statements to the Lambda function's IAM Role here
+#  iam:
+#    role:
+#      statements:
+#        - Effect: "Allow"
+#          Action:
+#            - "s3:ListBucket"
+#          Resource: { "Fn::Join" : ["", ["arn:aws:s3:::", { "Ref" : "ServerlessDeploymentBucket" } ] ]  }
+#        - Effect: "Allow"
+#          Action:
+#            - "s3:PutObject"
+#          Resource:
+#            Fn::Join:
+#              - ""
+#              - - "arn:aws:s3:::"
+#                - "Ref" : "ServerlessDeploymentBucket"
+#                - "/*"
+
+# you can define service wide environment variables here
+#  environment:
+#    variable1: value1
+
+# you can add packaging information here
+#package:
+#  patterns:
+#    - '!exclude-me.py'
+#    - '!exclude-me-dir/**'
+#    - include-me.py
+#    - include-me-dir/**
+
+functions:
+  preSignUp:
+    handler: src/preSignUp.handler
+ 
+  postConfirmation:
+    handler: src/postConfirmation.handler
+ 
+  preAuthentication:
+    handler: src/preAuthentication.handler
+ 
+  postAuthentication:
+    handler: src/postAuthentication.handler
+
+# # you can add CloudFormation resource templates here
+resources:
+  Resources:
+    # ---------------------------------------------------------------
+    # Cognito User Pool
+    # ---------------------------------------------------------------
+    CognitoUserPool:
+      Type: AWS::Cognito::UserPool
+      Properties:
+        UserPoolName: ${self:service}-${self:provider.stage}-user-pool
+        UsernameAttributes:
+          - email
+        AutoVerifiedAttributes:
+          - email
+        Schema:
+          - Name: email
+            AttributeDataType: String
+            Required: true
+            Mutable: true
+          - Name: given_name
+            AttributeDataType: String
+            Required: true
+            Mutable: true
+          - Name: family_name
+            AttributeDataType: String
+            Required: true
+            Mutable: true
+        Policies:
+          PasswordPolicy:
+            MinimumLength: 8
+            RequireUppercase: true
+            RequireLowercase: true
+            RequireNumbers: true
+            RequireSymbols: true
+        LambdaConfig:
+          PreSignUp: !GetAtt PreSignUpLambdaFunction.Arn
+          PostConfirmation: !GetAtt PostConfirmationLambdaFunction.Arn
+          PreAuthentication: !GetAtt PreAuthenticationLambdaFunction.Arn
+          PostAuthentication: !GetAtt PostAuthenticationLambdaFunction.Arn
+
+    # Permissions letting Cognito invoke each trigger
+    PreSignUpInvokePermission:
+      Type: AWS::Lambda::Permission
+      Properties:
+        FunctionName: !GetAtt PreSignUpLambdaFunction.Arn
+        Action: lambda:InvokeFunction
+        Principal: cognito-idp.amazonaws.com
+        SourceArn: !GetAtt CognitoUserPool.Arn
+ 
+    PostConfirmationInvokePermission:
+      Type: AWS::Lambda::Permission
+      Properties:
+        FunctionName: !GetAtt PostConfirmationLambdaFunction.Arn
+        Action: lambda:InvokeFunction
+        Principal: cognito-idp.amazonaws.com
+        SourceArn: !GetAtt CognitoUserPool.Arn
+ 
+    PreAuthenticationInvokePermission:
+      Type: AWS::Lambda::Permission
+      Properties:
+        FunctionName: !GetAtt PreAuthenticationLambdaFunction.Arn
+        Action: lambda:InvokeFunction
+        Principal: cognito-idp.amazonaws.com
+        SourceArn: !GetAtt CognitoUserPool.Arn
+ 
+    PostAuthenticationInvokePermission:
+      Type: AWS::Lambda::Permission
+      Properties:
+        FunctionName: !GetAtt PostAuthenticationLambdaFunction.Arn
+        Action: lambda:InvokeFunction
+        Principal: cognito-idp.amazonaws.com
+        SourceArn: !GetAtt CognitoUserPool.Arn
+ 
+    # ---------------------------------------------------------------
+    # App Client (used by Amplify on the Nuxt frontend)
+    # ---------------------------------------------------------------
+    CognitoUserPoolClient:
+      Type: AWS::Cognito::UserPoolClient
+      Properties:
+        ClientName: ${self:service}-${self:provider.stage}-web-client
+        UserPoolId: !Ref CognitoUserPool
+        GenerateSecret: false
+        ExplicitAuthFlows:
+          - ALLOW_USER_SRP_AUTH
+          - ALLOW_REFRESH_TOKEN_AUTH
+        PreventUserExistenceErrors: ENABLED
+        AccessTokenValidity: 60
+        IdTokenValidity: 60
+        RefreshTokenValidity: 30
+        TokenValidityUnits:
+          AccessToken: minutes
+          IdToken: minutes
+          RefreshToken: days
+
+    # ---------------------------------------------------------------
+    # DynamoDB extension table
+    # Holds data Cognito doesn't store natively, keyed by Cognito sub
+    # ---------------------------------------------------------------
+    UserProfileTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.USER_PROFILE_TABLE}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: userId
+            AttributeType: S
+          - AttributeName: email
+            AttributeType: S
+        KeySchema:
+          - AttributeName: userId
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: email-index
+            KeySchema:
+              - AttributeName: email
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+
+  Outputs:
+    UserPoolId:
+      Value: !Ref CognitoUserPool
+    UserPoolClientId:
+      Value: !Ref CognitoUserPoolClient
+    UserPoolArn:
+      Value: !GetAtt CognitoUserPool.Arn

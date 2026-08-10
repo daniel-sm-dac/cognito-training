@@ -1,0 +1,7 @@
+# Local development / testing only - NOT deployed to Lambda (boto3
+# already ships in the Lambda runtime, see requirements.txt).
+#
+# Install with: pip install -r requirements-dev.txt
+boto3>=1.34
+botocore>=1.34.0
+moto[cognitoidp,dynamodb]>=5.0   # mocks AWS services for offline tests
