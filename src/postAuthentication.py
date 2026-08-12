@@ -6,36 +6,27 @@ where we track authentication activity in the DynamoDB extension table -
 updating lastLoginTimestamp and incrementing loginCount without touching
 anything Cognito itself owns (password, tokens, MFA state, etc).
 """
-import logging
-import time
+from datetime import datetime, timezone
 from src import db
-
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
-
 
 def handler(event, context):
     table = db.getTable()
-    logger.info("PostAuthentication event: %s", event)
 
-    user_id = event["request"]["userAttributes"]["sub"]
+    user_id = event['userName']
+    now = datetime.now(timezone.utc).isoformat()
 
+    # Cognito doesn't hand you the issued tokens in this trigger's event —
+    # only claims/context about the auth attempt. If you need the actual
+    # token set stored, that has to happen client-side after signIn()
+    # resolves (Amplify), posting to your own API to save it.
     table.update_item(
-        Key={"userId": user_id},
-        UpdateExpression=(
-            "SET lastLoginTimestamp = :now "
-            "ADD loginCount :increment"
-        ),
+        Key={'userId': user_id},
+        UpdateExpression='SET lastSignIn = :ls, tokenIssuedAt = :ti, updatedAt = :ua',
         ExpressionAttributeValues={
-            ":now": int(time.time()),
-            ":increment": 1,
-        },
+            ':ls': now,
+            ':ti': now,
+            ':ua': now,
+        }
     )
-
-    print ("Authentication successful")
-    print ("Trigger function =", event['triggerSource'])
-    print ("User pool = ", event['userPoolId'])
-    print ("App client ID = ", event['callerContext']['clientId'])
-    print ("User ID = ", event['userName'])
 
     return event

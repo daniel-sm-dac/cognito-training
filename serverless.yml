@@ -37,63 +37,43 @@ provider:
   # Environment variables available to all functions
   environment:
     STAGE: ${self:custom.stage}
-    USER_PROFILE_TABLE: ${self:service}-${self:provider.stage}-user-profiles
+    TABLE_NAME: ${self:service}-${self:provider.stage}-user-profiles
 
   # http:
   #   cors: true
 
   iam:
     role: arn:aws:iam::710318463284:role/dac-uag2-lambda-execution-role-develop
-
-
-# you can overwrite defaults here
-#  stage: dev
-#  region: us-east-1
-
-# you can add statements to the Lambda function's IAM Role here
-#  iam:
-#    role:
-#      statements:
-#        - Effect: "Allow"
-#          Action:
-#            - "s3:ListBucket"
-#          Resource: { "Fn::Join" : ["", ["arn:aws:s3:::", { "Ref" : "ServerlessDeploymentBucket" } ] ]  }
-#        - Effect: "Allow"
-#          Action:
-#            - "s3:PutObject"
-#          Resource:
-#            Fn::Join:
-#              - ""
-#              - - "arn:aws:s3:::"
-#                - "Ref" : "ServerlessDeploymentBucket"
-#                - "/*"
-
-# you can define service wide environment variables here
-#  environment:
-#    variable1: value1
-
-# you can add packaging information here
-#package:
-#  patterns:
-#    - '!exclude-me.py'
-#    - '!exclude-me-dir/**'
-#    - include-me.py
-#    - include-me-dir/**
+  # iam:
+  #   role:
+  #     statements:
+  #       - Effect: Allow
+  #         Action:
+  #           - dynamodb:PutItem
+  #           - dynamodb:GetItem
+  #           - dynamodb:UpdateItem
+  #           - dynamodb:Query
+  #         Resource:
+  #           - !GetAtt UserProfileTable.Arn
+  #           - !Sub '${UserProfileTable.Arn}/index/*'
 
 functions:
   preSignUp:
     handler: src/preSignUp.handler
- 
+
   postConfirmation:
     handler: src/postConfirmation.handler
- 
+
   preAuthentication:
     handler: src/preAuthentication.handler
- 
+
   postAuthentication:
     handler: src/postAuthentication.handler
 
-# # you can add CloudFormation resource templates here
+  preTokenGeneration:
+    handler: src/preTokenGeneration.handler
+
+# CloudFormation resource templates here
 resources:
   Resources:
     # ---------------------------------------------------------------
@@ -132,6 +112,9 @@ resources:
           PostConfirmation: !GetAtt PostConfirmationLambdaFunction.Arn
           PreAuthentication: !GetAtt PreAuthenticationLambdaFunction.Arn
           PostAuthentication: !GetAtt PostAuthenticationLambdaFunction.Arn
+          PreTokenGenerationConfig:
+            LambdaVersion: V2_0
+            LambdaArn: !GetAtt PreTokenGenerationLambdaFunction.Arn
 
     # Permissions letting Cognito invoke each trigger
     PreSignUpInvokePermission:
@@ -141,7 +124,7 @@ resources:
         Action: lambda:InvokeFunction
         Principal: cognito-idp.amazonaws.com
         SourceArn: !GetAtt CognitoUserPool.Arn
- 
+
     PostConfirmationInvokePermission:
       Type: AWS::Lambda::Permission
       Properties:
@@ -149,7 +132,7 @@ resources:
         Action: lambda:InvokeFunction
         Principal: cognito-idp.amazonaws.com
         SourceArn: !GetAtt CognitoUserPool.Arn
- 
+
     PreAuthenticationInvokePermission:
       Type: AWS::Lambda::Permission
       Properties:
@@ -157,7 +140,7 @@ resources:
         Action: lambda:InvokeFunction
         Principal: cognito-idp.amazonaws.com
         SourceArn: !GetAtt CognitoUserPool.Arn
- 
+
     PostAuthenticationInvokePermission:
       Type: AWS::Lambda::Permission
       Properties:
@@ -165,7 +148,15 @@ resources:
         Action: lambda:InvokeFunction
         Principal: cognito-idp.amazonaws.com
         SourceArn: !GetAtt CognitoUserPool.Arn
- 
+
+    PreTokenGenerationInvokePermission:
+      Type: AWS::Lambda::Permission
+      Properties:
+        FunctionName: !GetAtt PreTokenGenerationLambdaFunction.Arn
+        Action: lambda:InvokeFunction
+        Principal: cognito-idp.amazonaws.com
+        SourceArn: !GetAtt CognitoUserPool.Arn
+
     # ---------------------------------------------------------------
     # App Client (used by Amplify on the Nuxt frontend)
     # ---------------------------------------------------------------
@@ -194,7 +185,7 @@ resources:
     UserProfileTable:
       Type: AWS::DynamoDB::Table
       Properties:
-        TableName: ${self:provider.environment.USER_PROFILE_TABLE}
+        TableName: ${self:provider.environment.TABLE_NAME}
         BillingMode: PAY_PER_REQUEST
         AttributeDefinitions:
           - AttributeName: userId
