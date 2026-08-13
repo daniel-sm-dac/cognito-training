@@ -1,50 +1,46 @@
 import logging
 from datetime import datetime, timezone
 from src import db
-from boto3.dynamodb.conditions import Key
+from botocore.exceptions import ClientError
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 def handler(event, context):
   
-  table = db.getTable()
-  
-  user_attributes = event['request']['userAttributes']
-  logger.info("user_attributes: %s", user_attributes)
+  user_id = event["request"]["userAttributes"]["sub"]
+  email = event["request"]["userAttributes"]["email"]
 
-  user_id = event['userName']
-  email = user_attributes.get('email')
-
+  logger.info("user_attributes: %s", event["request"]["userAttributes"])
   logger.info("PreSignUp for email: %s", email)
 
-  existing = table.query(
-      IndexName="email-index",
-      KeyConditionExpression=Key("email").eq(email)
-  ).get("Items")
+  # existing = table.query(
+  #     IndexName="email-index",
+  #     KeyConditionExpression=Key("email").eq(email)
+  # ).get("Items")
 
-  if existing:
+  if db.email_exists(email):
     logger.info("An account with this email already exists: %s", email)
     raise Exception("An account with this email already exists")
-  
 
-  now = datetime.now(timezone.utc).isoformat()
-
-  table.put_item(
-    Item={
-      'userId': user_id,
+  try:
+    now = datetime.now(timezone.utc).isoformat()
+    db.put_profile({
+      'user_id': user_id,
       'email': email,
-      'givenName': user_attributes.get('given_name'),
-      'familyName': user_attributes.get('family_name'),
+      'given_name': event["request"]["userAttributes"].get('given_name'),
+      'family_name': event["request"]["userAttributes"].get('family_name'),
       'verified': False,
       'role': 'user',
       'status': 'ACTIVE',
-      'createdAt': now,
-      'updatedAt': now,
-      'session': ''
-    },
-    ConditionExpression='attribute_not_exists(userId)'  # race-condition safety net for userId
-  )
+      'created_at': now,
+      'updated_at': now,
+    })
+
+  except ClientError as e:
+    if e.response["Error"]["Code"] == "ConditionalCheckFailedException":
+      raise Exception("User already exists")
+    raise
 
   return event
 
