@@ -25,7 +25,7 @@ provider:
   stage: ${self:custom.stage}
   profile: ${opt:aws-profile, 'dev'}
   memorySize: 256
-  timeout: 10
+  timeout: 5
 
   #Tags the CloudFormation stack itself
   stackTags: ${self:custom.commonTags}
@@ -73,9 +73,52 @@ functions:
   preTokenGeneration:
     handler: src/preTokenGeneration.handler
 
+  getAllUser:
+    handler: src/user/getAllUser.handler
+    events:
+      - http:
+          path: users
+          method: get
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+
 # CloudFormation resource templates here
 resources:
   Resources:
+    # ---------------------------------------------------------------
+    # Authorizer
+    # ---------------------------------------------------------------
+    ApiGatewayAuthorizer:
+      Type: AWS::ApiGateway::Authorizer
+      Properties:
+        Name: cognito-authorizer
+        Type: COGNITO_USER_POOLS
+        IdentitySource: method.request.header.Authorization
+        RestApiId:
+          Ref: ApiGatewayRestApi
+        ProviderARNs:
+          - Fn::GetAtt: [CognitoUserPool, Arn]
+    GatewayResponseDefault4XX:
+      Type: AWS::ApiGateway::GatewayResponse
+      Properties:
+        ResponseType: DEFAULT_4XX
+        RestApiId:
+          Ref: ApiGatewayRestApi
+        ResponseParameters:
+          gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+          gatewayresponse.header.Access-Control-Allow-Headers: "'*'"
+    GatewayResponseDefault5XX:
+      Type: AWS::ApiGateway::GatewayResponse
+      Properties:
+        ResponseType: DEFAULT_5XX
+        RestApiId:
+          Ref: ApiGatewayRestApi
+        ResponseParameters:
+          gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+          gatewayresponse.header.Access-Control-Allow-Headers: "'*'"
     # ---------------------------------------------------------------
     # Cognito User Pool
     # ---------------------------------------------------------------
