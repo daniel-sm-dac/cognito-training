@@ -41,7 +41,7 @@ def get_session(user_id):
 def create_session(user_id, id_token, access_token, refresh_token, registration_channel):
   table = getTable()
   now = int(time.time())
-  table.put_item(Item={
+  response = table.put_item(Item={
     "user_id": user_id,
     "SK": "session",
     "token_set": {
@@ -54,6 +54,8 @@ def create_session(user_id, id_token, access_token, refresh_token, registration_
     "created_at": now,
     "updated_at": now,
   })
+
+  return response
 
 def refresh_session(table, user_id, id_token, access_token):
   # Called after using the stored refreshToken to mint a fresh id/access token.

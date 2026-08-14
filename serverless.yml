@@ -93,22 +93,14 @@ functions:
           path: session
           method: post
           cors: true
-          authorizer:
-            type: COGNITO_USER_POOLS
-            authorizerId:
-              Ref: ApiGatewayAuthorizer
     
   getSession:
     handler: src/session/getSession.handler
     events:
       - http:
-          path: session
+          path: session/{userId}
           method: get
           cors: true
-          authorizer:
-            type: COGNITO_USER_POOLS
-            authorizerId:
-              Ref: ApiGatewayAuthorizer
 
 # CloudFormation resource templates here
 resources:
