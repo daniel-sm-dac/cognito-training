@@ -8,7 +8,7 @@ logger.setLevel(logging.INFO)
 
 def handler(event, context):
   
-  user_id = event["request"]["userAttributes"]["sub"]
+  user_id = event['userName']
   email = event["request"]["userAttributes"]["email"]
 
   logger.info("user_attributes: %s", event["request"]["userAttributes"])

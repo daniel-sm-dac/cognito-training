@@ -7,7 +7,7 @@ logger.setLevel(logging.INFO)
 
 def handler(event, context):
     
-    user_id = event["request"]["userAttributes"]["sub"]
+    user_id = event['userName']
     logger.info("PreAuthentication for user_id: %s", user_id)
 
     profile = db.get_profile(user_id)

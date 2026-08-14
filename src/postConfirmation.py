@@ -2,8 +2,7 @@ from datetime import datetime, timezone
 from src import db
 
 def handler(event, context):
-    # user_id = event['userName']
-    user_id = event["request"]["userAttributes"]["sub"]
+    user_id = event['userName']
 
     now = datetime.now(timezone.utc).isoformat()
 

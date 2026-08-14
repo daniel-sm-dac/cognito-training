@@ -37,7 +37,7 @@ provider:
   # Environment variables available to all functions
   environment:
     STAGE: ${self:custom.stage}
-    TABLE_NAME: ${self:service}-${self:provider.stage}-user-profiles
+    TABLE_NAME: ${self:service}-${self:provider.stage}-sso-training
 
   # http:
   #   cors: true
@@ -78,6 +78,31 @@ functions:
     events:
       - http:
           path: users
+          method: get
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+
+  # Sessions API
+  postSession:
+    handler: src/session/postSession.handler
+    events:
+      - http:
+          path: session
+          method: post
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+    
+  getSession:
+    handler: src/session/getSession.handler
+    events:
+      - http:
+          path: session
           method: get
           cors: true
           authorizer:
@@ -231,13 +256,17 @@ resources:
         TableName: ${self:provider.environment.TABLE_NAME}
         BillingMode: PAY_PER_REQUEST
         AttributeDefinitions:
-          - AttributeName: userId
+          - AttributeName: user_id
+            AttributeType: S
+          - AttributeName: SK
             AttributeType: S
           - AttributeName: email
             AttributeType: S
         KeySchema:
-          - AttributeName: userId
+          - AttributeName: user_id
             KeyType: HASH
+          - AttributeName: SK
+            KeyType: RANGE
         GlobalSecondaryIndexes:
           - IndexName: email-index
             KeySchema:
