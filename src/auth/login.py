@@ -49,6 +49,7 @@ def handler(event, context):
     access_token = auth_result["AuthenticationResult"]["AccessToken"]
     refresh_token = auth_result["AuthenticationResult"]["RefreshToken"]
 
+    # cognito.get_user(AccessToken=access_token) - retrieve the profile details and attributes of the currently logged-in user 
     user_resp = cognito.get_user(AccessToken=access_token)
     user_id = next(a["Value"] for a in user_resp["UserAttributes"] if a["Name"] == "sub")
 

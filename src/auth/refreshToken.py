@@ -10,6 +10,7 @@ cognito = boto3.client('cognito-idp', region_name=os.environ['REGION'])
 USER_POOL_CLIENT_ID = os.environ['COGNITO_CLIENT_ID']
 
 def handler(event, context):
+  # Get the stored refresh token (which user/app session this is for)
   body = json.loads(event["body"])
   refresh_token = body.get('refresh_token')
   user_id = body.get("user_id")
@@ -23,6 +24,7 @@ def handler(event, context):
     }
     return response
 
+  # Exchange the refresh token for a new ID/access token pair
   try:
     result = cognito.initiate_auth(
       ClientId=USER_POOL_CLIENT_ID,
@@ -30,7 +32,7 @@ def handler(event, context):
       AuthParameters={'REFRESH_TOKEN': refresh_token}
     )
   except ClientError as e:
-    # refresh token expired, revoked, or invalid — session is truly over
+    # refresh token expired, revoked, or invalid — session is truly over (user must log in again)
     return {
       'statusCode': 401,
       "headers": {"Access-Control-Allow-Origin": "*"},
@@ -40,7 +42,8 @@ def handler(event, context):
   auth_result = result['AuthenticationResult']
   new_id_token = auth_result['IdToken']
   new_access_token = auth_result['AccessToken']
-  now = int(time.time())
+
+  # Save the new tokens to DynamoDB (refresh_token stays the same)
   db.refresh_session(user_id, client_app_id, new_id_token, new_access_token)
 
   response = {

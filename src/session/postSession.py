@@ -1,3 +1,4 @@
+# Does not need anymore after the refactoring
 import json
 import logging
 from src import db
