@@ -39,6 +39,7 @@ provider:
     STAGE: ${self:custom.stage}
     TABLE_NAME: ${self:service}-${self:provider.stage}-sso-training
     COGNITO_CLIENT_ID: "3bt8targ9a8ikpi7fn302jugct" # TODO do not hardcoded it - move to env
+    REGION: ${self:custom.region}
 
   # http:
   #   cors: true
@@ -111,6 +112,13 @@ functions:
           method: get
           cors: true
 
+        
+  refreshToken:
+    handler: src/auth/refreshToken.handler
+    events:
+      - http:
+          path: refreshToken.handler
+          method: post
 # CloudFormation resource templates here
 resources:
   Resources:

@@ -57,12 +57,15 @@ def create_session(user_id, client_app_id, id_token, access_token, refresh_token
 
   return response
 
-def refresh_session(table, user_id, id_token, access_token):
+def refresh_session(table, user_id, client_app_id, id_token, access_token):
   # Called after using the stored refreshToken to mint a fresh id/access token.
   # refreshToken itself doesnt change on a standard refresh, so it's left as-is.
   now = int(time.time())
   table.update_item(
-    Key={"user_id": user_id, "SK": "session"},
+    Key={
+      "user_id": user_id,
+      "SK": f"session#{client_app_id}"
+    },
     UpdateExpression="SET token_set.id_token = :i, token_set.access_token = :a, refresh_status = :s, updated_at = :u",
     ExpressionAttributeValues={
       ":i": id_token,
