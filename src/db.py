@@ -33,24 +33,24 @@ def update_profile(user_id, fields: dict):
     ExpressionAttributeValues={f":{k}": v for k, v in fields.items()}
   )
 
-def get_session(user_id):
+def get_session(user_id, client_app_id):
   table = getTable()
-  response = table.get_item(Key={"user_id": user_id, "SK": "session"})
+  response = table.get_item(Key={"user_id": user_id, "SK": f"session#{client_app_id}"})
   return response.get("Item")
 
-def create_session(user_id, id_token, access_token, refresh_token, registration_channel):
+def create_session(user_id, client_app_id, id_token, access_token, refresh_token, registration_channel):
   table = getTable()
   now = int(time.time())
   response = table.put_item(Item={
     "user_id": user_id,
-    "SK": "session",
+    "SK": f"session#{client_app_id}",
     "token_set": {
         "id_token": id_token,
         "access_token": access_token,
-        "refresh_status": refresh_token,
+        "refresh_token": refresh_token
     },
-    "refresh_status": "valid",
     "registration_channel": registration_channel,
+    "refresh_status": "valid",
     "created_at": now,
     "updated_at": now,
   })

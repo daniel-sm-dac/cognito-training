@@ -38,6 +38,7 @@ provider:
   environment:
     STAGE: ${self:custom.stage}
     TABLE_NAME: ${self:service}-${self:provider.stage}-sso-training
+    COGNITO_CLIENT_ID: "3bt8targ9a8ikpi7fn302jugct" # TODO do not hardcoded it - move to env
 
   # http:
   #   cors: true
@@ -73,6 +74,14 @@ functions:
   preTokenGeneration:
     handler: src/preTokenGeneration.handler
 
+  loginUser:
+    handler: src/auth/login.handler
+    events:
+      - http:
+          path: login
+          method: post
+          cors: true
+
   getAllUser:
     handler: src/user/getAllUser.handler
     events:
@@ -98,7 +107,7 @@ functions:
     handler: src/session/getSession.handler
     events:
       - http:
-          path: session/{userId}
+          path: session/{userId}/{client_app_id}
           method: get
           cors: true
 
@@ -227,8 +236,9 @@ resources:
         UserPoolId: !Ref CognitoUserPool
         GenerateSecret: false
         ExplicitAuthFlows:
+          - ALLOW_USER_PASSWORD_AUTH # allows client-side apps to authenticate users by sending plaintext usernames and passwords directly via the API
           - ALLOW_USER_SRP_AUTH
-          - ALLOW_REFRESH_TOKEN_AUTH
+          - ALLOW_REFRESH_TOKEN_AUTH # Typically required to keep sessions alive
         PreventUserExistenceErrors: ENABLED
         AccessTokenValidity: 60
         IdTokenValidity: 60
