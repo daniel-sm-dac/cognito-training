@@ -25,7 +25,7 @@ provider:
   stage: ${self:custom.stage}
   profile: ${opt:aws-profile, 'dev'}
   memorySize: 256
-  timeout: 5
+  timeout: 15
 
   #Tags the CloudFormation stack itself
   stackTags: ${self:custom.commonTags}

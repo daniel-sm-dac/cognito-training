@@ -24,10 +24,25 @@ def handler(event, context):
         AuthParameters={"USERNAME": username, "PASSWORD": password},
       )
     except cognito.exceptions.NotAuthorizedException:
+      # wrong password, or account exists or credentials don't match
       return {
         "statusCode": 401,
         "headers": {"Access-Control-Allow-Origin": "*"},
         "body": json.dumps({"error": "invalid_credentials"}),
+      }
+    except cognito.exceptions.UserNotFoundException:
+      # no account exists for this username/email
+      return {
+        "statusCode": 401,
+        "headers": {"Access-Control-Allow-Origin": "*"},
+        "body": json.dumps({"error": "invalid_credentials"}),  # same message as above — don't reveal whether the account exists
+      }
+    except cognito.exceptions.UserNotConfirmedException:
+      # account exists but the user never completed email verification
+      return {
+        "statusCode": 403,
+        "headers": {"Access-Control-Allow-Origin": "*"},
+        "body": json.dumps({"error": "account_not_verified"}),
       }
 
     id_token = auth_result["AuthenticationResult"]["IdToken"]
