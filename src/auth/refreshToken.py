@@ -24,6 +24,16 @@ def handler(event, context):
     }
     return response
 
+  # Get session to check if the refresh status is valid; if not session is expired
+  session = db.get_session(user_id, client_app_id)
+  if not session or session.get("refresh_status") != "valid":
+    response = {
+      'statusCode': 400,
+      "headers": {"Access-Control-Allow-Origin": "*"},
+      'body': json.dumps({'error': 'session_expired'})
+    }
+    return response
+  
   # Exchange the refresh token for a new ID/access token pair
   try:
     result = cognito.initiate_auth(
@@ -33,6 +43,7 @@ def handler(event, context):
     )
   except ClientError as e:
     # refresh token expired, revoked, or invalid — session is truly over (user must log in again)
+    db.force_expire_session(user_id, client_app_id)
     return {
       'statusCode': 401,
       "headers": {"Access-Control-Allow-Origin": "*"},

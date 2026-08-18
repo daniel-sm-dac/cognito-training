@@ -26,7 +26,7 @@ def email_exists(email):
 
 def update_profile(user_id, fields: dict):
   table = getTable()
-  fields["updated_at"] = int(time.time())
+  fields["updated_at"] = datetime.now(timezone.utc).isoformat()
   table.update_item(
     Key={"user_id": user_id, "SK": "user"},
     UpdateExpression="SET " + ", ".join(f"{k} = :{k}" for k in fields),
@@ -40,7 +40,7 @@ def get_session(user_id, client_app_id):
 
 def create_session(user_id, client_app_id, id_token, access_token, refresh_token, registration_channel):
   table = getTable()
-  now = int(time.time())
+  now = datetime.now(timezone.utc).isoformat()
   response = table.put_item(Item={
     "user_id": user_id,
     "SK": f"session#{client_app_id}",
@@ -57,10 +57,11 @@ def create_session(user_id, client_app_id, id_token, access_token, refresh_token
 
   return response
 
-def refresh_session(table, user_id, client_app_id, id_token, access_token):
+def refresh_session(user_id, client_app_id, id_token, access_token):
+  table = getTable()
   # Called after using the stored refreshToken to mint a fresh id/access token.
   # refreshToken itself doesnt change on a standard refresh, so it's left as-is.
-  now = int(time.time())
+  now = datetime.now(timezone.utc).isoformat()
   table.update_item(
     Key={
       "user_id": user_id,
@@ -73,6 +74,15 @@ def refresh_session(table, user_id, client_app_id, id_token, access_token):
       ":s": "valid",
       ":u": now,
     }
+  )
+
+def force_expire_session(user_id, client_app_id):
+  table = getTable()
+  now = datetime.now(timezone.utc).isoformat()
+  table.update_item(
+    Key={"user_id": user_id, "SK": f"session#{client_app_id}"},
+    UpdateExpression="SET refresh_status = :s, updated_at = :u",
+    ExpressionAttributeValues={":s": "expired", ":u":now}
   )
 
 def getTable():
